@@ -4,6 +4,7 @@ const cheerio = require('cheerio');
 const async = require('async');
 const sha1 = require('sha1');
 const AWS = require('aws-sdk');
+const fs = require('fs');
 
 AWS.config.update({
     region: 'ap-northeast-2',
@@ -13,31 +14,42 @@ AWS.config.update({
 //const dynamodb = new AWS.DynamoDB();
 const docClient = new AWS.DynamoDB.DocumentClient();
 
-var jar = request.jar();
-var req = request.defaults({
-    headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Encoding': 'gzip, deflate',
-        'Accept-Language': 'ko,en-US;q=0.8,en;q=0.6'
-    },
-    jar: jar,
-    gzip: true,
-    followAllRedirects: true,
-    //encoding: null
-});
+var jar;
+var req;
 
 var captchaId = '';
 var saltValue = '';
 var loginToken = '';
 
 var start = function (callback) {
-    callback(null, {
-        data: {
-            couponCount: 0,
-        },
-        message: "",
-        loggedIn: false,
+    fs.readFile('cookie.json', (err, data) => {
+        if (err) {
+            console.log(err);
+            jar = request.jar();
+        } else {
+            jar = JSON.parse(data);
+        }
+
+        req = request.defaults({
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Encoding': 'gzip, deflate',
+                'Accept-Language': 'ko,en-US;q=0.8,en;q=0.6'
+            },
+            jar: jar,
+            gzip: true,
+            followAllRedirects: true,
+            //encoding: null
+        });
+
+        callback(null, {
+            data: {
+                couponCount: 0,
+            },
+            message: "",
+            loggedIn: false,
+        });
     });
 };
 
@@ -48,7 +60,7 @@ var requestLoginPage = function (result, callback) {
     }
 
     var option = {
-        uri: 'https://front.wemakeprice.com/user/login',
+        uri: 'https://mw.wemakeprice.com/user/login',
         method: 'GET',
         qs: {
         }
@@ -72,7 +84,7 @@ var requestCaptcha = function (result, callback) {
     //                $("#_captchaImage").attr("src", defaultUrl + userApiURL.captchaImgUrl + "?captchaId=" + getCaptchaId + "&time=" + cacheExpireTime),
 
     var option = {
-        uri: 'https://front.wemakeprice.com/api/user/login/getCaptchaId.json',
+        uri: 'https://mw.wemakeprice.com/api/user/login/getCaptchaId.json',
         method: 'GET',
         json: true,
         qs: {
@@ -80,7 +92,7 @@ var requestCaptcha = function (result, callback) {
         headers: {
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Content-Type': 'application/json',
-            'Referer': 'https://front.wemakeprice.com/user/login',
+            'Referer': 'https://mw.wemakeprice.com/user/login',
         }
     };
 
@@ -108,7 +120,7 @@ var requestSalt = function (result, callback) {
     }
 
     var option = {
-        uri: 'https://front.wemakeprice.com/api/user/login/salt.json',
+        uri: 'https://mw.wemakeprice.com/api/user/login/salt.json',
         method: 'GET',
         json: true,
         qs: {
@@ -117,7 +129,7 @@ var requestSalt = function (result, callback) {
         headers: {
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Content-Type': 'application/json',
-            'Referer': 'https://front.wemakeprice.com/user/login',
+            'Referer': 'https://mw.wemakeprice.com/user/login',
         }
     };
 
@@ -149,20 +161,20 @@ var requestLoginProcess = function (result, callback) {
     var encryptValue = sha1(loginSalts + sha1(lowerCasePW)) + loginSalts;
 
     var option = {
-        uri: 'https://front.wemakeprice.com/api/edge/login.json',
+        uri: 'https://mw.wemakeprice.com/api/edge/login.json',
         method: 'POST',
         json: true,
         body: {
+            autoLogin: 1,
             captcha: "",
             captchaId: captchaId,
-            selectionYn: "Y",
             userId: authConfig.id,
             userPassword: encryptValue
         },
         headers: {
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Content-Type': 'application/json',
-            'Referer': 'https://front.wemakeprice.com/user/login',
+            'Referer': 'https://mw.wemakeprice.com/user/login',
         }
     };
 
@@ -175,48 +187,24 @@ var requestLoginProcess = function (result, callback) {
         loginToken = body && body.data && body.data.loginToken;
         if (loginToken) {
             result.loggedIn = true;
-            console.log(JSON.stringify(jar, null, 2));
-            callback(err, result);
+            fs.writeFile('cookie.json', JSON.stringify(jar, null, 2), (err) => {
+                if (err) {
+                    console.log(err);
+                }
+                callback(err, result);
+            });
+
         } else {
             result.loggedIn = false;
             console.log("Login failed!");
-            callback(err, result);
-        }
-    });
-};
-
-var requestLoginCheck = function (result, callback) {
-    var option = {
-        uri: 'https://front.wemakeprice.com/main',
-        method: 'GET',
-        qs: {
-        }
-    };
-
-    req(option, function (err, response, body) {
-        result.response = response;
-        result.body = body;
-
-        console.log("Checking Login Result");
-        if (!err && body.indexOf("_logOutBtn") < 0) {
-            result.loggedIn = false;
-            console.log("Login failed!");
-            callback(err, result);
-        } else {
-            result.loggedIn = true;
             callback(err, result);
         }
     });
 };
 
 var requestCouponPage = function (result, callback) {
-    if (!result.loggedIn) {
-        callback(null, result);
-        return;
-    }
-
     var option = {
-        uri: 'https://front.wemakeprice.com/mypage/coupon',
+        uri: 'https://mw.wemakeprice.com/mypage',
         method: 'GET',
         qs: {
         }
@@ -228,9 +216,14 @@ var requestCouponPage = function (result, callback) {
 
         console.log("Parsing Coupon Count");
         if (!err) {
-            var $ = cheerio.load(body);
-            result.data.couponCount = parseInt($('div.my_detail_box.on > dl > dd:nth-child(6) > a > em').text(), 10);
-            console.log("Coupon Count:", result.data.couponCount);
+            if (body.indexOf('ico_mypage_logout.png') < 0) {
+                result.loggedIn = false;
+                console.log("Login failed!");
+            } else {
+                var $ = cheerio.load(body);
+                result.data.couponCount = parseInt($('div.total_mypage > dl:nth-child(2) > dd > a > em:nth-child(1)').text(), 10);
+                console.log("Coupon Count:", result.data.couponCount);
+            }
         }
 
         callback(err, result);
@@ -314,12 +307,11 @@ var notifyReport = function (result, callback) {
 exports.handler = function (event, context, callback) {
     async.waterfall([
         start,
-        requestLoginCheck,
+        requestCouponPage,
         requestLoginPage,
         requestCaptcha,
         requestSalt,
         requestLoginProcess,
-        requestLoginCheck,
         requestCouponPage,
         makeReport,
         saveReport,

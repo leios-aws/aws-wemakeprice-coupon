@@ -1,0 +1,11 @@
+{
+	"auth": {
+		"id": "id",
+		"pw": "pw"
+	},
+	"telegram": {
+		"bot_id": "",
+		"token": "",
+		"chat_id": ""
+	}
+}

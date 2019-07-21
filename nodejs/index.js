@@ -4,6 +4,7 @@ const cheerio = require('cheerio');
 const async = require('async');
 const sha1 = require('sha1');
 const AWS = require('aws-sdk');
+
 AWS.config.update({
     region: 'ap-northeast-2',
     endpoint: "http://dynamodb.ap-northeast-2.amazonaws.com"
@@ -12,6 +13,7 @@ AWS.config.update({
 //const dynamodb = new AWS.DynamoDB();
 const docClient = new AWS.DynamoDB.DocumentClient();
 
+var jar = request.jar();
 var req = request.defaults({
     headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36',
@@ -19,7 +21,7 @@ var req = request.defaults({
         'Accept-Encoding': 'gzip, deflate',
         'Accept-Language': 'ko,en-US;q=0.8,en;q=0.6'
     },
-    jar: true,
+    jar: jar,
     gzip: true,
     followAllRedirects: true,
     //encoding: null
@@ -40,6 +42,11 @@ var start = function (callback) {
 };
 
 var requestLoginPage = function (result, callback) {
+    if (result.loggedIn) {
+        callback(null, result);
+        return;
+    }
+
     var option = {
         uri: 'https://front.wemakeprice.com/user/login',
         method: 'GET',
@@ -57,6 +64,13 @@ var requestLoginPage = function (result, callback) {
 };
 
 var requestCaptcha = function (result, callback) {
+    if (result.loggedIn) {
+        callback(null, result);
+        return;
+    }
+
+    //                $("#_captchaImage").attr("src", defaultUrl + userApiURL.captchaImgUrl + "?captchaId=" + getCaptchaId + "&time=" + cacheExpireTime),
+
     var option = {
         uri: 'https://front.wemakeprice.com/api/user/login/getCaptchaId.json',
         method: 'GET',
@@ -88,6 +102,11 @@ var requestCaptcha = function (result, callback) {
 };
 
 var requestSalt = function (result, callback) {
+    if (result.loggedIn) {
+        callback(null, result);
+        return;
+    }
+
     var option = {
         uri: 'https://front.wemakeprice.com/api/user/login/salt.json',
         method: 'GET',
@@ -118,6 +137,11 @@ var requestSalt = function (result, callback) {
 };
 
 var requestLoginProcess = function (result, callback) {
+    if (result.loggedIn) {
+        callback(null, result);
+        return;
+    }
+
     var authConfig = config.get('auth');
 
     var lowerCasePW = authConfig.pw.toLowerCase();
@@ -131,7 +155,7 @@ var requestLoginProcess = function (result, callback) {
         body: {
             captcha: "",
             captchaId: captchaId,
-            selectionYn: "N",
+            selectionYn: "Y",
             userId: authConfig.id,
             userPassword: encryptValue
         },
@@ -151,6 +175,7 @@ var requestLoginProcess = function (result, callback) {
         loginToken = body && body.data && body.data.loginToken;
         if (loginToken) {
             result.loggedIn = true;
+            console.log(JSON.stringify(jar, null, 2));
             callback(err, result);
         } else {
             result.loggedIn = false;
@@ -161,11 +186,6 @@ var requestLoginProcess = function (result, callback) {
 };
 
 var requestLoginCheck = function (result, callback) {
-    if (!result.loggedIn) {
-        callback(null, result);
-        return;
-    }
-
     var option = {
         uri: 'https://front.wemakeprice.com/main',
         method: 'GET',
@@ -183,6 +203,7 @@ var requestLoginCheck = function (result, callback) {
             console.log("Login failed!");
             callback(err, result);
         } else {
+            result.loggedIn = true;
             callback(err, result);
         }
     });
@@ -208,7 +229,7 @@ var requestCouponPage = function (result, callback) {
         console.log("Parsing Coupon Count");
         if (!err) {
             var $ = cheerio.load(body);
-            result.data.couponCount = $('div.my_detail_box.on > dl > dd:nth-child(6) > a > em').text();
+            result.data.couponCount = parseInt($('div.my_detail_box.on > dl > dd:nth-child(6) > a > em').text(), 10);
             console.log("Coupon Count:", result.data.couponCount);
         }
 
@@ -292,6 +313,7 @@ var notifyReport = function (result, callback) {
 exports.handler = function (event, context, callback) {
     async.waterfall([
         start,
+        requestLoginCheck,
         requestLoginPage,
         requestCaptcha,
         requestSalt,

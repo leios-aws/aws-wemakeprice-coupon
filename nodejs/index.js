@@ -22,34 +22,25 @@ var saltValue = '';
 var loginToken = '';
 
 var start = function (callback) {
-    fs.readFile('cookie.json', (err, data) => {
-        if (err) {
-            console.log(err);
-            jar = request.jar();
-        } else {
-            jar = JSON.parse(data);
-        }
+    req = request.defaults({
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Encoding': 'gzip, deflate',
+            'Accept-Language': 'ko,en-US;q=0.8,en;q=0.6'
+        },
+        jar: true,
+        gzip: true,
+        followAllRedirects: true,
+        //encoding: null
+    });
 
-        req = request.defaults({
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Encoding': 'gzip, deflate',
-                'Accept-Language': 'ko,en-US;q=0.8,en;q=0.6'
-            },
-            jar: jar,
-            gzip: true,
-            followAllRedirects: true,
-            //encoding: null
-        });
-
-        callback(null, {
-            data: {
-                couponCount: 0,
-            },
-            message: "",
-            loggedIn: false,
-        });
+    callback(null, {
+        data: {
+            couponCount: 0,
+        },
+        message: "",
+        loggedIn: false,
     });
 };
 
@@ -187,13 +178,7 @@ var requestLoginProcess = function (result, callback) {
         loginToken = body && body.data && body.data.loginToken;
         if (loginToken) {
             result.loggedIn = true;
-            fs.writeFile('cookie.json', JSON.stringify(jar, null, 2), (err) => {
-                if (err) {
-                    console.log(err);
-                }
-                callback(err, result);
-            });
-
+            callback(err, result);
         } else {
             result.loggedIn = false;
             console.log("Login failed!");
@@ -223,6 +208,11 @@ var requestCouponPage = function (result, callback) {
                 var $ = cheerio.load(body);
                 result.data.couponCount = parseInt($('div.total_mypage > dl:nth-child(2) > dd > a > em:nth-child(1)').text(), 10);
                 console.log("Coupon Count:", result.data.couponCount);
+
+                // http://m.wemakeprice.com/m/mypage/saleCoupon_getList_json/usable
+
+                // https://mw.wemakeprice.com/mypage/coupon
+                // div.sale_coupon_wrap > div.coupon_list > ul
             }
         }
 

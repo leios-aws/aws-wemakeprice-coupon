@@ -13,5 +13,5 @@ rm -Rf .git
 
 echo "Init new git repository"
 git init
-git remote add origin git@github.com:leios76/${NAME}.git
+git remote add origin git@github.com:leios-aws/${NAME}.git
 git flow init -d

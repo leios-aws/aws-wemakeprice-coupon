@@ -44,7 +44,7 @@ git checkout develop && \
 	git flow release start ${RELEASE_VERSION} && \
 	sed -ri "s/\"version\": \"[^\"]+\"/\"version\": \"${RELEASE_VERSION}\"/g" nodejs/package.json && \
 	git ci -a -m "릴리즈 버전 ${RELEASE_VERSION} 적용" && \
-	GIT_MERGE_AUTOEDIT=no git flow release finish -m "Finish ${RELEASE_VERSION}" -s -p && \
+	GIT_MERGE_AUTOEDIT=no git flow release finish ${RELEASE_VERSION} -m "Finish ${RELEASE_VERSION}" -s -p && \
 	git checkout master && \
 	./deploy.sh && \
 	git checkout develop
